@@ -6,7 +6,7 @@ from flask_socketio import SocketIO, emit
 import random
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'a-simple-and-working-secret-key'
+app.config['SECRET_KEY'] = 'a-simple-and-working-secret-key-finally'
 socketio = SocketIO(app, async_mode='eventlet')
 
 # --- Constants ---
