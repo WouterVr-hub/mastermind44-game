@@ -188,10 +188,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('update_player_list', (data) => {
+        // THE FIX: The data.players is now an array of objects.
+        // We will store it and then render the UI.
         players = data.players;
         ui.playerList.innerHTML = '';
-        Object.values(players).forEach(p => ui.playerList.appendChild(document.createElement('li')).textContent = p.name);
-        if (isHost) renderHostSetupUI();
+        // Now we iterate through the array of objects to display the names
+        players.forEach(p => {
+            const li = document.createElement('li');
+            li.textContent = p.name;
+            ui.playerList.appendChild(li);
+        });
+        
+        // Also re-render the host UI, which now has the correct data.
+        if (isHost) {
+            renderHostSetupUI();
+        }
     });
     
     socket.on('is_host', (data) => {
@@ -282,4 +293,5 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
 
