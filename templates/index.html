@@ -107,8 +107,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderHostSetupUI() {
-        // This check prevents the function from running before colors are loaded
-        if (!isHost || SECRET_COLORS.length === 0) return;
+        // THE FIX: This check prevents the function from running if we don't have the color list yet.
+        if (!isHost || SECRET_COLORS.length === 0) {
+            return;
+        }
 
         const playerArray = allPlayers.filter(p => !p.is_host);
         ui.hostSetupRows.innerHTML = '';
@@ -122,8 +124,10 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             ui.hostSetupRows.appendChild(row);
         });
+
         populateSelectors('.host-pos-select', [1, 2, 3, 4, 5]);
         populateSelectors('.host-color-select', SECRET_COLORS);
+
         const canStart = playerArray.length >= 2;
         ui.startGameBtn.disabled = !canStart;
         ui.startGameBtn.textContent = canStart ? "Start Game" : "Need 2+ Players";
@@ -177,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
         GUESS_OPTIONS = data.colors;
         SECRET_COLORS = data.secret_colors;
         populateSelectors('#input-area select', GUESS_OPTIONS);
-        // THE FIX: Now that we have colors, we can safely try to render the host UI
+        // THE FIX: Now that we have colors, we can safely try to render the host UI.
         renderHostSetupUI();
     });
 
@@ -185,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         allPlayers = data.players;
         ui.playerList.innerHTML = '';
         allPlayers.forEach(p => ui.playerList.appendChild(document.createElement('li')).textContent = p.name);
-        // THE FIX: Also re-render the host UI when the player list changes
+        // THE FIX: Also re-render the host UI when the player list changes to update the button text and player rows.
         renderHostSetupUI();
     });
     
