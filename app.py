@@ -6,7 +6,7 @@ from flask_socketio import SocketIO, emit
 import random
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'a-truly-stable-secret-key-that-works'
+app.config['SECRET_KEY'] = 'a-simple-and-working-secret-key'
 socketio = SocketIO(app, async_mode='eventlet')
 
 # --- Constants ---
@@ -15,23 +15,21 @@ GUESS_OPTIONS = SECRET_COLORS + ["empty"]
 CODE_LENGTH = 5
 MAX_SECRET_HOLDERS = 4
 
-# --- Game State Management using a Class for Stability ---
+# --- Game State Class for Stability ---
 class GameState:
     def __init__(self):
-        self.players = {}  # {sid: {"name": str, "is_host": bool, "secret": dict}}
+        self.players = {}
         self.game_started = False
         self.player_order = []
         self.current_turn_sid = None
         self.host_sid = None
         self.guesses = []
-        print("--- New GameState created. Server is ready. ---")
+        print("--- New, Clean GameState created. Server is ready. ---")
 
     def get_player_list_data(self):
-        """Returns a list of player data safe to send to clients."""
         return [{"sid": sid, "name": data["name"], "is_host": data["is_host"]} for sid, data in self.players.items()]
 
     def reset_board(self):
-        """Resets the game board but keeps all players."""
         for player_data in self.players.values():
             player_data.pop("secret", None)
             player_data.pop("eliminated", None)
@@ -39,7 +37,7 @@ class GameState:
         self.current_turn_sid = None
         self.player_order = []
         self.guesses = []
-        print("--- Game board has been reset by host ---")
+        print("--- Game board has been reset. ---")
 
 GAME = GameState()
 
@@ -50,8 +48,7 @@ def index():
 @socketio.on('connect')
 def handle_connect():
     print(f"Client connected: {request.sid}")
-    # Immediately send crucial data to the newly connected client.
-    emit('color_list', {'colors': GUESS_OPTIONS, 'secret_colors': SECRET_COLORS})
+    emit('color_list', {'colors': GUESS_OPTIONS})
     if GAME.game_started:
         emit('game_in_progress')
 
@@ -60,22 +57,19 @@ def handle_disconnect():
     global GAME
     if request.sid in GAME.players:
         player_name = GAME.players.pop(request.sid).get("name", "A player")
-        print(f"Player '{player_name}' with SID {request.sid} disconnected.")
-
-        # If the host disconnects, the entire game must be reset for everyone.
+        print(f"Player '{player_name}' disconnected.")
+        
         if request.sid == GAME.host_sid:
-            print("Host disconnected. A full server reset is triggered.")
+            print("Host disconnected. Full server reset.")
             GAME = GameState()
             emit('game_reset_full', {'message': 'The Host has disconnected. The game has been fully reset.'}, broadcast=True)
-        # If a player leaves during a game, reset the board.
         elif GAME.game_started:
-            print("A player left mid-game. Resetting the board.")
+            print("A player left mid-game. Resetting board.")
             GAME.reset_board()
             emit('game_reset_board', {'message': f'{player_name} left. The game board has been reset.'}, broadcast=True)
-            emit('update_player_list', {'players': GAME.get_player_list_data()}, broadcast=True)
-        # If a player leaves before the game, just update the player list.
-        else:
-            emit('update_player_list', {'players': GAME.get_player_list_data()}, broadcast=True)
+        
+        # Always update the player list after a disconnect
+        emit('update_player_list', {'players': GAME.get_player_list_data()}, broadcast=True)
 
 @socketio.on('register_player')
 def handle_register(data):
@@ -85,7 +79,6 @@ def handle_register(data):
     sid = request.sid
     name = data.get('name', f'Player_{sid[:4]}')
     is_host = not GAME.host_sid
-    
     if is_host:
         GAME.host_sid = sid
         name += " (Host)"
@@ -102,29 +95,27 @@ def handle_reset_by_host():
         emit('game_reset_board', {'message': 'The Host has reset the game board.'}, broadcast=True)
         emit('update_player_list', {'players': GAME.get_player_list_data()}, broadcast=True)
 
+### SIMPLIFIED START_GAME FUNCTION ###
 @socketio.on('start_game')
-def handle_start_game(data):
+def handle_start_game():
     if request.sid != GAME.host_sid or GAME.game_started: return
-    
-    secrets_from_host = data.get('secrets')
-    unassigned_pos = data.get('unassigned_pos')
-    if not secrets_from_host or not unassigned_pos:
-        return emit('error', {'message': 'Invalid start game data from host.'})
 
     actual_players_sids = [sid for sid, p_data in GAME.players.items() if not p_data["is_host"]]
     if len(actual_players_sids) < 2:
         return emit('error', {'message': 'Need at least 2 players to start.'})
         
     GAME.game_started = True
-    print("--- Starting Game with Host-Defined Secrets ---")
+    print("--- Starting Game with Server-Generated Secrets ---")
 
-    for assignment in secrets_from_host:
-        player_sid = assignment["sid"]
-        if player_sid in GAME.players:
-            secret = {"pos": assignment["pos"], "color": assignment["color"]}
-            GAME.players[player_sid]["secret"] = secret
-            emit('your_secret', secret, room=player_sid)
-            print(f"Assigned to '{GAME.players[player_sid]['name']}': Pos {secret['pos']}, Color {secret['color']}")
+    players_to_get_secrets = actual_players_sids[:MAX_SECRET_HOLDERS]
+    positions = list(range(1, CODE_LENGTH + 1))
+    random.shuffle(positions)
+
+    for player_sid in players_to_get_secrets:
+        secret = {"pos": positions.pop(0), "color": random.choice(SECRET_COLORS)}
+        GAME.players[player_sid]["secret"] = secret
+        emit('your_secret', secret, room=player_sid)
+        print(f"Assigned secret to '{GAME.players[player_sid]['name']}'")
 
     GAME.player_order = actual_players_sids
     random.shuffle(GAME.player_order)
@@ -133,7 +124,7 @@ def handle_start_game(data):
     
     emit('game_started', {'turn': current_player_name}, broadcast=True)
 
-# The submit_guess function does not need changes, but it is included here for completeness.
+# Full submit_guess function for copy-pasting
 @socketio.on('submit_guess')
 def handle_guess(data):
     sid = request.sid
