@@ -1,1 +1,0 @@
-worker_class = 'eventlet'
