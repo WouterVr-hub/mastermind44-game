@@ -1,8 +1,6 @@
-   ```
    setuptools==65.5.0
    Flask==2.3.3
    Flask-SocketIO==5.3.6
    eventlet==0.33.3
    simple-websocket==0.10.0
    waitress==2.1.2
-   ```
