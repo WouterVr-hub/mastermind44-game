@@ -68,7 +68,6 @@ def handle_disconnect():
             GAME.reset_board()
             emit('game_reset_board', {'message': f'{player_name} left. The game board has been reset.'}, broadcast=True)
         
-        # Always update the player list after a disconnect
         emit('update_player_list', {'players': GAME.get_player_list_data()}, broadcast=True)
 
 @socketio.on('register_player')
@@ -95,7 +94,6 @@ def handle_reset_by_host():
         emit('game_reset_board', {'message': 'The Host has reset the game board.'}, broadcast=True)
         emit('update_player_list', {'players': GAME.get_player_list_data()}, broadcast=True)
 
-### SIMPLIFIED START_GAME FUNCTION ###
 @socketio.on('start_game')
 def handle_start_game():
     if request.sid != GAME.host_sid or GAME.game_started: return
@@ -110,21 +108,28 @@ def handle_start_game():
     players_to_get_secrets = actual_players_sids[:MAX_SECRET_HOLDERS]
     positions = list(range(1, CODE_LENGTH + 1))
     random.shuffle(positions)
+    
+    host_overview_data = {}
+    unassigned_position = None
 
     for player_sid in players_to_get_secrets:
         secret = {"pos": positions.pop(0), "color": random.choice(SECRET_COLORS)}
         GAME.players[player_sid]["secret"] = secret
         emit('your_secret', secret, room=player_sid)
+        host_overview_data[secret['pos']] = secret['color']
         print(f"Assigned secret to '{GAME.players[player_sid]['name']}'")
+
+    if positions:
+        unassigned_position = positions[0]
 
     GAME.player_order = actual_players_sids
     random.shuffle(GAME.player_order)
     GAME.current_turn_sid = GAME.player_order[0]
     current_player_name = GAME.players[GAME.current_turn_sid]["name"]
     
+    emit('host_overview', {'secrets': host_overview_data, 'unassigned_pos': unassigned_position}, room=GAME.host_sid)
     emit('game_started', {'turn': current_player_name}, broadcast=True)
 
-# Full submit_guess function for copy-pasting
 @socketio.on('submit_guess')
 def handle_guess(data):
     sid = request.sid
