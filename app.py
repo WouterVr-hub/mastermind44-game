@@ -77,16 +77,24 @@ def handle_reset_by_host():
 def handle_register(data):
     if GAME_STATE["game_started"]:
         return emit('error', {'message': 'Game has already started.'})
+    
     sid = request.sid
     name = data.get('name', f'Player_{sid[:4]}')
+    
     is_host = not GAME_STATE["host_sid"]
     if is_host:
         GAME_STATE["host_sid"] = sid
         name += " (Host)"
+    
     GAME_STATE["players"][sid] = {"name": name, "is_host": is_host}
     emit('is_host', {'is_host': is_host}, room=sid)
-    player_names = [p['name'] for p in GAME_STATE["players"].values()]
-    emit('update_player_list', {'players': player_names}, broadcast=True)
+    
+    # THE FIX: Send a list of objects with both name and SID
+    player_list_with_sids = [
+        {"sid": s, "name": p["name"], "is_host": p["is_host"]}
+        for s, p in GAME_STATE["players"].items()
+    ]
+    emit('update_player_list', {'players': player_list_with_sids}, broadcast=True)
     print(f"Player '{name}' registered. Host status: {is_host}")
 
 ### CHANGE 3: `start_game` now accepts a custom code assignment from the host.
@@ -372,4 +380,5 @@ def handle_guess(data):
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
+
 
