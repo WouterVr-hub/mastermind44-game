@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hostCodeSetup: document.getElementById('host-code-setup'), hostSetupRows: document.getElementById('host-setup-rows'),
         startGameBtn: document.getElementById('start-game-btn'), hostControls: document.getElementById('host-controls'), resetGameBtn: document.getElementById('reset-game-btn'),
     };
-    let myName = '', isHost = false, mySid = '', SECRET_COLORS = [], GUESS_OPTIONS = [], allPlayers = [];
+    let myName = '', isHost = false, SECRET_COLORS = [], GUESS_OPTIONS = [], allPlayers = [];
 
     function populateSelectors(selectorClass, options) {
         document.querySelectorAll(selectorClass).forEach(select => {
@@ -107,6 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderHostSetupUI() {
+        // This check prevents the function from running before colors are loaded
+        if (!isHost || SECRET_COLORS.length === 0) return;
+
         const playerArray = allPlayers.filter(p => !p.is_host);
         ui.hostSetupRows.innerHTML = '';
         playerArray.slice(0, 4).forEach((player) => {
@@ -170,19 +173,20 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.inputArea.classList.add('hidden');
     }
     
-    socket.on('connect', () => { mySid = socket.id; });
-
     socket.on('color_list', (data) => {
         GUESS_OPTIONS = data.colors;
         SECRET_COLORS = data.secret_colors;
         populateSelectors('#input-area select', GUESS_OPTIONS);
+        // THE FIX: Now that we have colors, we can safely try to render the host UI
+        renderHostSetupUI();
     });
 
     socket.on('update_player_list', (data) => {
         allPlayers = data.players;
         ui.playerList.innerHTML = '';
         allPlayers.forEach(p => ui.playerList.appendChild(document.createElement('li')).textContent = p.name);
-        if (isHost) renderHostSetupUI();
+        // THE FIX: Also re-render the host UI when the player list changes
+        renderHostSetupUI();
     });
     
     socket.on('is_host', (data) => {
