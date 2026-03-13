@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastermind44 Online</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: space-around; padding: 20px; background-color: #3d2c1f; }
+        .container { background-color: #c4a788; border: 2px solid #5c3d2e; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 0 10px rgba(0,0,0,0.2); }
+        h1, h2, h3, h4 { text-align: center; color: #3d2c1f; text-shadow: 1px 1px 1px #e0c4a9; margin-top: 0; }
+        h1 { font-size: 2.5em; }
+        .game-area, .info-area { width: 45%; max-width: 700px; }
+        #login-area, #info-panel { text-align: center; }
+        #player-name-input, select { padding: 8px; border-radius: 4px; border: 1px solid #5c3d2e; background-color: #f5eadd; font-weight: bold; }
+        button { font-weight: bold; padding: 10px 15px; border-radius: 4px; border: 2px solid #3d2c1f; cursor: pointer; background-color: #8c6d52; color: #f5eadd; margin: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        button:hover { background-color: #7a5f47; }
+        button:disabled { background-color: #a1887f; color: #d7ccc8; border-color: #795548; cursor: not-allowed; }
+        #game-board { border-collapse: collapse; width: 100%; margin-top: 20px; background-color: #a1887f; border: 2px solid #5c3d2e; }
+        #game-board th, #game-board td { border: 1px solid #795548; padding: 8px; text-align: center; }
+        #game-board th { background-color: #5c3d2e; color: #f5eadd; }
+        .guess-peg, .key-peg { width: 30px; height: 30px; border-radius: 50%; display: inline-block; vertical-align: middle; box-sizing: border-box; box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), 0 1px 1px rgba(255,255,255,0.4); }
+        .feedback-cell { display: grid; grid-template-columns: repeat(4, auto); gap: 4px; justify-content: center; }
+        .red { background-color: #c62828; } .blue { background-color: #1565c0; } .green { background-color: #2e7d32; }
+        .yellow { background-color: #f9a825; } .black { background-color: #212121; } .white { background-color: #e0e0e0; }
+        .empty { background: repeating-linear-gradient(45deg, #a1887f, #a1887f 5px, #8d7468 5px, #8d7468 10px); }
+        #secret-piece-display, #host-overview-display, #feedback-key { margin-top: 15px; border-top: 2px solid #8c6d52; padding-top: 15px; }
+        .peg-container { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 5px; }
+        .input-group { display: flex; justify-content: center; gap: 5px; margin-bottom: 10px; }
+        #feedback-key { font-size: 0.9em; padding: 10px; background-color: #d7ccc8; border: 1px solid #a1887f; border-radius: 5px; margin-top: 20px; color: #3d2c1f; }
+        #feedback-key .key-item { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+    </style>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+
+<div class="container info-area">
+    <h1>Mastermind 44</h1>
+    <div id="login-area">
+        <input type="text" id="player-name-input" placeholder="Enter your name">
+        <button id="register-btn">Join Game</button>
+    </div>
+    <div id="game-controls" style="display: none;">
+        <h2>Game Info</h2>
+        <div id="info-panel">
+            <p id="status-message">Waiting for players...</p>
+            <p>Your Name: <b id="my-name"></b></p>
+            <div id="host-overview-display"></div>
+            <div id="secret-piece-display"></div>
+        </div>
+        <h3>Players</h3>
+        <ul id="player-list"></ul>
+        <button id="start-game-btn" style="display: none;">Start Game</button>
+    </div>
+</div>
+
+<div class="container game-area" id="game-main" style="display: none;">
+    <h2>Game Board</h2>
+    <table id="game-board">
+        <thead><tr><th>Guesser</th><th colspan="5">Guess</th><th>Feedback</th></tr></thead>
+        <tbody id="guesses-tbody"></tbody>
+    </table>
+    <div id="feedback-key">
+        <h3>Feedback Key</h3>
+        <div class="key-item"><div class="key-peg black"></div><span><b>Black Peg:</b> Right color in the right position.</span></div>
+        <div class="key-item"><div class="key-peg white"></div><span><b>White Peg:</b> Right color in a wrong position.</span></div>
+    </div>
+    <div id="input-area" style="display: none;">
+        <h3>Your Guess</h3>
+        <div class="input-group">
+            <select id="pos1"></select><select id="pos2"></select><select id="pos3"></select><select id="pos4"></select><select id="pos5"></select>
+        </div>
+        <button id="submit-guess-btn">Submit Guess</button>
+        <button id="final-guess-btn" style="background-color: #a04040;">"MASTERMIND!" (Final Guess)</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const socket = io();
+        const ui = {
+            loginArea: document.getElementById('login-area'), registerBtn: document.getElementById('register-btn'), nameInput: document.getElementById('player-name-input'),
+            gameControls: document.getElementById('game-controls'), startGameBtn: document.getElementById('start-game-btn'), myNameDisplay: document.getElementById('my-name'),
+            playerList: document.getElementById('player-list'), statusMessage: document.getElementById('status-message'), secretDisplay: document.getElementById('secret-piece-display'),
+            hostOverview: document.getElementById('host-overview-display'), gameMain: document.getElementById('game-main'), guessesTbody: document.getElementById('guesses-tbody'),
+            inputArea: document.getElementById('input-area'), submitGuessBtn: document.getElementById('submit-guess-btn'), finalGuessBtn: document.getElementById('final-guess-btn'),
+        };
+        let myName = '';
+        let isHost = false;
+
+        function populateColorSelectors(colors) {
+            for (let i = 1; i <= 5; i++) {
+                const select = document.getElementById(`pos${i}`);
+                if (!select) continue;
+                select.innerHTML = colors.map(color => {
+                    const label = color.charAt(0).toUpperCase() + color.slice(1);
+                    return `<option value="${color}">${label}</option>`;
+                }).join('');
+            }
+        }
+        
+        function resetGuessFields() {
+            for (let i = 1; i <= 5; i++) {
+                document.getElementById(`pos${i}`).value = 'empty';
+            }
+        }
+
+        ui.registerBtn.addEventListener('click', () => {
+            myName = ui.nameInput.value.trim();
+            if (myName) {
+                socket.emit('register_player', { name: myName });
+                ui.loginArea.style.display = 'none';
+                ui.gameControls.style.display = 'block';
+                ui.myNameDisplay.textContent = myName;
+            } else { alert('Please enter a name.'); }
+        });
+        
+        ui.startGameBtn.addEventListener('click', () => {
+            socket.emit('start_game');
+            ui.startGameBtn.disabled = true;
+        });
+
+        ui.submitGuessBtn.addEventListener('click', () => makeGuess(false));
+        ui.finalGuessBtn.addEventListener('click', () => {
+            if (confirm("Are you sure? A wrong final guess will eliminate you!")) makeGuess(true);
+        });
+
+        function makeGuess(isFinal) {
+            const guess = [];
+            for (let i = 1; i <= 5; i++) guess.push(document.getElementById(`pos${i}`).value);
+            socket.emit('submit_guess', { guess: guess, is_final: isFinal });
+            ui.inputArea.style.display = 'none';
+        }
+
+        socket.on('color_list', (data) => populateColorSelectors(data.colors));
+
+        socket.on('update_player_list', (data) => {
+            ui.playerList.innerHTML = '';
+            data.players.forEach(name => ui.playerList.appendChild(document.createElement('li')).textContent = name);
+            if (isHost) {
+                const canStart = data.players.length >= 3;
+                ui.startGameBtn.disabled = !canStart;
+                ui.startGameBtn.textContent = canStart ? "Start Game" : "Need 2+ Players";
+            }
+        });
+        
+        socket.on('is_host', (data) => {
+            isHost = data.is_host;
+            if (isHost) ui.startGameBtn.style.display = 'block';
+        });
+
+        socket.on('host_overview', (data) => {
+            let html = '<h4>Secret Pieces:</h4>';
+            for (const [pos, color] of Object.entries(data.secrets)) {
+                html += `<div class="peg-container" style="justify-content: left;"><span style="min-width: 60px;">Pos ${pos}:</span><div class="guess-peg ${color}"></div></div>`;
+            }
+            html += `<p style="margin-top: 10px; text-align: center;">Position <b>${data.unassigned_pos}</b> is the empty slot.</p>`;
+            ui.hostOverview.innerHTML = html;
+        });
+
+        socket.on('your_secret', (data) => {
+            ui.secretDisplay.innerHTML = `<h4>Your Secret Piece:</h4><div class="peg-container"><span>Position ${data.pos}:</span><div class="guess-peg ${data.color}"></div></div>`;
+        });
+        
+        socket.on('game_started', (data) => {
+            ui.gameMain.style.display = 'block';
+            ui.startGameBtn.style.display = 'none';
+            ui.statusMessage.textContent = `Turn: ${data.turn}`;
+            resetGuessFields();
+            if (data.turn === myName && !isHost) {
+                ui.inputArea.style.display = 'block';
+            }
+        });
+
+        socket.on('new_turn', (data) => {
+            const { last_guess, next_turn } = data;
+            const row = ui.guessesTbody.insertRow(0);
+            row.innerHTML = `<td>${last_guess.guesser}</td>
+                             ${last_guess.guess.map(color => `<td><div class="guess-peg ${color || 'empty'}"></div></td>`).join('')}
+                             <td class="feedback-cell">${renderFeedback(last_guess.feedback)}</td>`;
+            ui.statusMessage.textContent = `Turn: ${next_turn}`;
+            resetGuessFields();
+            ui.inputArea.style.display = (next_turn === myName && !isHost) ? 'block' : 'none';
+        });
+        
+        function renderFeedback(feedback) {
+            const sortedGivers = Object.values(feedback).sort((a,b) => a.giver.localeCompare(b.giver));
+            return sortedGivers.map(fb => {
+                let pegClass = 'empty';
+                if (fb.black === 1) pegClass = 'black';
+                else if (fb.white === 1) pegClass = 'white';
+                return `<div><div class="key-peg ${pegClass}" title="Feedback from ${fb.giver}"></div></div>`;
+            }).join('');
+        }
+        
+        socket.on('game_over', (data) => {
+            ui.statusMessage.textContent = 'Game Over!';
+            ui.inputArea.style.display = 'none';
+            if (data.winner) {
+                const codeStr = data.secret_code.map(c => c || 'Empty').join(', ');
+                alert(`Game Over! ${data.winner} has guessed the secret code: ${codeStr}`);
+            } else {
+                alert('Game Over! All players were eliminated.');
+            }
+        });
+
+        socket.on('eliminated', (data) => {
+            alert(`${data.name} made a wrong final guess and is eliminated!`);
+            if (data.name === myName) {
+                ui.finalGuessBtn.disabled = true;
+                ui.submitGuessBtn.disabled = true;
+                ui.inputArea.style.display = 'none';
+                ui.statusMessage.textContent += " (You are eliminated)";
+            }
+        });
+
+        socket.on('game_reset', (data) => { alert(data.message); window.location.reload(); });
+        socket.on('game_in_progress', () => ui.loginArea.innerHTML = '<h2>A game is already in progress. Please wait.</h2>');
+        socket.on('error', (data) => { alert('Error: ' + data.message); });
+    });
+</script>
+</body>
+</html>
