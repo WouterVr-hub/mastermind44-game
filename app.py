@@ -32,18 +32,13 @@ GAME_STATE = create_initial_game_state()
 def reset_game_logic():
     """Resets the game state but keeps players and host info."""
     global GAME_STATE
-    # Keep the existing players, but clear their game-specific data
     for sid, player_data in GAME_STATE["players"].items():
-        if "secret" in player_data:
-            del player_data["secret"]
-        if "eliminated" in player_data:
-            del player_data["eliminated"]
-
-    GAME_STATE["unassigned_position"] = None
-    GAME_STATE["game_started"] = False
-    GAME_STATE["current_turn_sid"] = None
-    GAME_STATE["player_order"] = []
-    GAME_STATE["guesses"] = []
+        player_data.pop("secret", None)
+        player_data.pop("eliminated", None)
+    GAME_STATE.update({
+        "unassigned_position": None, "game_started": False, "current_turn_sid": None,
+        "player_order": [], "guesses": []
+    })
     print("--- Game state has been reset by host ---")
 
 @app.route('/')
@@ -56,6 +51,7 @@ def handle_connect():
     if GAME_STATE["game_started"]:
         emit('game_in_progress')
     emit('color_list', {'colors': GUESS_OPTIONS, 'secret_colors': SECRET_COLORS}, room=request.sid)
+    emit('your_sid', {'sid': request.sid})
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -66,30 +62,38 @@ def handle_disconnect():
         GAME_STATE = create_initial_game_state()
         emit('game_reset_full', {'message': f'{player_name} has disconnected. The server has been reset.'}, broadcast=True)
 
-### CHANGE 1: New event for host to reset the game state.
 @socketio.on('reset_game_by_host')
 def handle_reset_by_host():
     if request.sid == GAME_STATE["host_sid"]:
         reset_game_logic()
         emit('game_reset_board', {'message': 'The Host has reset the game board.'}, broadcast=True)
 
+### THE FIX IS IN THIS FUNCTION ###
 @socketio.on('register_player')
 def handle_register(data):
     if GAME_STATE["game_started"]:
         return emit('error', {'message': 'Game has already started.'})
+    
     sid = request.sid
     name = data.get('name', f'Player_{sid[:4]}')
     is_host = not GAME_STATE["host_sid"]
     if is_host:
         GAME_STATE["host_sid"] = sid
         name += " (Host)"
+    
     GAME_STATE["players"][sid] = {"name": name, "is_host": is_host}
     emit('is_host', {'is_host': is_host}, room=sid)
-    player_names = [p['name'] for p in GAME_STATE["players"].values()]
-    emit('update_player_list', {'players': player_names}, broadcast=True)
+    
+    # Create a list of player objects {sid, name, is_host} to send to the client
+    # This gives the host's browser the SIDs it needs to set up the game
+    player_list_with_sids = [
+        {"sid": s, "name": p["name"], "is_host": p["is_host"]}
+        for s, p in GAME_STATE["players"].items()
+    ]
+    emit('update_player_list', {'players': player_list_with_sids}, broadcast=True)
     print(f"Player '{name}' registered. Host status: {is_host}")
 
-### CHANGE 3: `start_game` now accepts a custom code assignment from the host.
+
 @socketio.on('start_game')
 def handle_start_game(data):
     if request.sid != GAME_STATE["host_sid"]:
@@ -111,7 +115,6 @@ def handle_start_game(data):
     print("--- Starting Game with Host-Defined Secrets ---")
 
     host_overview = {}
-    # secrets_from_host is a list of {"sid": player_sid, "pos": pos, "color": color}
     for secret_assignment in secrets_from_host:
         player_sid = secret_assignment["sid"]
         if player_sid in GAME_STATE["players"]:
@@ -132,9 +135,10 @@ def handle_start_game(data):
     emit('host_overview', {'secrets': host_overview, 'unassigned_pos': GAME_STATE['unassigned_position']}, room=GAME_STATE["host_sid"])
     emit('game_started', {'turn': current_player_name}, broadcast=True)
 
-# The 'submit_guess' function and the rest of the file remain unchanged from the last working version.
+# The 'submit_guess' function and the rest of the file remain unchanged.
 @socketio.on('submit_guess')
 def handle_guess(data):
+    # This function did not need changes.
     global GAME_STATE
     sid = request.sid
     if sid != GAME_STATE["current_turn_sid"]:
