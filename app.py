@@ -73,20 +73,24 @@ def handle_disconnect():
 
 @socketio.on('register_player')
 def handle_register(data):
-    if GAME.game_started:
+    if GAME_STATE["game_started"]:
         return emit('error', {'message': 'Game has already started.'})
     
     sid = request.sid
     name = data.get('name', f'Player_{sid[:4]}')
-    is_host = not GAME.host_sid
+    
+    is_host = not GAME_STATE["host_sid"]
     if is_host:
-        GAME.host_sid = sid
+        GAME_STATE["host_sid"] = sid
         name += " (Host)"
     
-    GAME.players[sid] = {"name": name, "is_host": is_host}
-    emit('is_host', {'is_host': is_host})
+    GAME_STATE["players"][sid] = {"name": name, "is_host": is_host}
+    emit('is_host', {'is_host': is_host}, room=sid)
+    
+    # THE FIX: Send a list of objects with a "name" property, not just strings.
+    player_list_data = [{"name": p["name"]} for p in GAME_STATE["players"].values()]
+    emit('update_player_list', {'players': player_list_data}, broadcast=True)
     print(f"Player '{name}' registered. Host status: {is_host}")
-    emit('update_player_list', {'players': GAME.get_player_list_data()}, broadcast=True)
 
 @socketio.on('reset_game_by_host')
 def handle_reset_by_host():
@@ -176,5 +180,6 @@ def handle_guess(data):
     emit('game_over', {'winner': None}, broadcast=True)
 
 # The if __name__ == '__main__': block is intentionally left out for Render deployment.
+
 
 
