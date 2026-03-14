@@ -27,7 +27,6 @@ class GameState:
         print("--- New, Clean GameState created. Server is ready. ---")
 
     def get_player_list_data(self):
-        # We only need to send names to the client for this simplified version
         return [data["name"] for data in self.players.values()]
 
     def reset_board(self):
@@ -73,24 +72,20 @@ def handle_disconnect():
 
 @socketio.on('register_player')
 def handle_register(data):
-    if GAME_STATE["game_started"]:
+    if GAME.game_started:
         return emit('error', {'message': 'Game has already started.'})
     
     sid = request.sid
     name = data.get('name', f'Player_{sid[:4]}')
-    
-    is_host = not GAME_STATE["host_sid"]
+    is_host = not GAME.host_sid
     if is_host:
-        GAME_STATE["host_sid"] = sid
+        GAME.host_sid = sid
         name += " (Host)"
     
-    GAME_STATE["players"][sid] = {"name": name, "is_host": is_host}
-    emit('is_host', {'is_host': is_host}, room=sid)
-    
-    # THE FIX: Send a list of objects with a "name" property, not just strings.
-    player_list_data = [{"name": p["name"]} for p in GAME_STATE["players"].values()]
-    emit('update_player_list', {'players': player_list_data}, broadcast=True)
+    GAME.players[sid] = {"name": name, "is_host": is_host}
+    emit('is_host', {'is_host': is_host})
     print(f"Player '{name}' registered. Host status: {is_host}")
+    emit('update_player_list', {'players': GAME.get_player_list_data()}, broadcast=True)
 
 @socketio.on('reset_game_by_host')
 def handle_reset_by_host():
@@ -114,7 +109,6 @@ def handle_start_game():
     positions = list(range(1, CODE_LENGTH + 1))
     random.shuffle(positions)
     
-    ### CHANGE 2: Prepare a dictionary for the host's overview ###
     host_overview_data = {}
     unassigned_position = None
 
@@ -122,8 +116,6 @@ def handle_start_game():
         secret = {"pos": positions.pop(0), "color": random.choice(SECRET_COLORS)}
         GAME.players[player_sid]["secret"] = secret
         emit('your_secret', secret, room=player_sid)
-        
-        ### CHANGE 2: Add this player's secret to the host's data ###
         host_overview_data[secret['pos']] = secret['color']
         print(f"Assigned secret to '{GAME.players[player_sid]['name']}'")
 
@@ -135,9 +127,7 @@ def handle_start_game():
     GAME.current_turn_sid = GAME.player_order[0]
     current_player_name = GAME.players[GAME.current_turn_sid]["name"]
     
-    ### CHANGE 2: Send the complete overview to the host only ###
     emit('host_overview', {'secrets': host_overview_data, 'unassigned_pos': unassigned_position}, room=GAME.host_sid)
-    
     emit('game_started', {'turn': current_player_name}, broadcast=True)
 
 @socketio.on('submit_guess')
@@ -179,7 +169,6 @@ def handle_guess(data):
             return
     emit('game_over', {'winner': None}, broadcast=True)
 
-# The if __name__ == '__main__': block is intentionally left out for Render deployment.
-
-
-
+# This block is intentionally left out for Render deployment. 
+# if __name__ == '__main__':
+#     socketio.run(app, host='0.0.0.0', port=5000)
