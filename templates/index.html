@@ -15,6 +15,11 @@
         .hidden { display: none; }
         .host-section, #secret-piece-display, #host-overview-display { margin-top: 15px; border-top: 2px solid #8c6d52; padding-top: 15px; }
         .peg-container { display: flex; align-items: center; justify-content: left; gap: 10px; margin-bottom: 5px; }
+        .guess-peg { width: 30px; height: 30px; border-radius: 50%; display: inline-block; vertical-align: middle; box-shadow: inset 0 2px 4px rgba(0,0,0,0.4); }
+        .red { background-color: #c62828; } .blue { background-color: #1565c0; } .green { background-color: #2e7d32; }
+        .yellow { background-color: #f9a825; } .black { background-color: #212121; } .white { background-color: #e0e0e0; }
+        /* CHANGE 3: Better visual for empty pegs */
+        .empty { background: repeating-linear-gradient(45deg, #a1887f, #a1887f 5px, #8d7468 5px, #8d7468 10px); }
     </style>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
@@ -102,6 +107,13 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.emit('submit_guess', { guess, is_final: isFinal });
         document.getElementById('input-area').classList.add('hidden');
     }
+    
+    function resetGuessFields() {
+        if (!document.getElementById('pos1')) return; // Only run if the input area exists
+        for(let i=1; i<=5; i++) {
+            document.getElementById(`pos${i}`).value = 'empty';
+        }
+    }
 
     document.getElementById('register-btn').addEventListener('click', () => {
         state.myName = document.getElementById('player-name-input').value.trim();
@@ -143,10 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.startGameBtn.classList.add('hidden');
         if(state.isHost) ui.resetGameBtn.classList.remove('hidden');
         ui.statusMessage.textContent = `Turn: ${data.turn}`;
+        
+        // CHANGE 1: Reset fields for the first player's turn
+        resetGuessFields();
+        
         if (data.turn === state.myName) {
-            const inputArea = document.getElementById('input-area');
-            inputArea.classList.remove('hidden');
-            for(let i=1; i<=5; i++) document.getElementById(`pos${i}`).value = 'empty';
+            document.getElementById('input-area').classList.remove('hidden');
         }
     });
 
@@ -154,41 +168,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const { last_guess, next_turn } = data;
         const guessesTbody = document.getElementById('guesses-tbody');
         const row = guessesTbody.insertRow(0);
-        const pegStyle = "width:30px;height:30px;border-radius:50%;display:inline-block;vertical-align:middle;box-shadow:inset 0 2px 4px rgba(0,0,0,0.4);";
         const keyPegStyle = "width:20px;height:20px;border-radius:50%;display:inline-block;border:1px solid #5c3d2e;";
 
         row.innerHTML = `
             <td style="border: 1px solid #795548; padding: 8px;">${last_guess.guesser}</td>
-            ${last_guess.guess.map(c => `<td style="border: 1px solid #795548; padding: 8px;"><div style="${pegStyle}background-color:${c === 'empty' ? '#8d7468' : c};"></div></td>`).join('')}
+            ${last_guess.guess.map(c => `<td style="border: 1px solid #795548; padding: 8px;"><div class="guess-peg ${c}"></div></td>`).join('')}
             <td style="border: 1px solid #795548; padding: 8px; display:grid; grid-template-columns: repeat(4, auto); gap: 4px; justify-content: center;">
                 ${Object.values(last_guess.feedback).map(fb => `<div><div style="${keyPegStyle}background-color:${fb.black ? '#212121' : fb.white ? '#e0e0e0' : 'transparent'};" title="From ${fb.giver}"></div></div>`).join('')}
             </td>`;
         
         ui.statusMessage.textContent = `Turn: ${next_turn}`;
+        // CHANGE 1: Reset fields for the new player's turn
+        resetGuessFields();
         const inputArea = document.getElementById('input-area');
-        if (inputArea) {
-            for(let i=1; i<=5; i++) document.getElementById(`pos${i}`).value = 'empty';
-            if (next_turn === state.myName) inputArea.classList.remove('hidden');
-            else inputArea.classList.add('hidden');
-        }
+        if (next_turn === state.myName) inputArea.classList.remove('hidden');
+        else inputArea.classList.add('hidden');
     });
     
+    // CHANGE 2: New handler for the host overview
     socket.on('host_overview', (data) => {
+        if (!state.isHost) return;
         let html = '<h4>Secret Code Overview:</h4>';
-        const fullCode = Array(5).fill(null);
+        const fullCode = Array(5).fill('empty');
         if (data.secrets) {
             for (const [pos, color] of Object.entries(data.secrets)) {
                 fullCode[parseInt(pos) - 1] = color;
             }
         }
-        if (data.unassigned_pos) {
-            fullCode[data.unassigned_pos - 1] = 'empty';
-        }
-
         fullCode.forEach((color, index) => {
-            const displayColor = color || 'empty';
-            const pegStyle = `width:30px;height:30px;border-radius:50%;display:inline-block;background-color:${displayColor === 'empty' ? '#8d7468' : displayColor};`;
-            html += `<div class="peg-container"><span style="min-width: 60px;">Pos ${index + 1}:</span><div style="${pegStyle}"></div></div>`;
+            html += `<div class="peg-container"><span style="min-width: 60px;">Pos ${index + 1}:</span><div class="guess-peg ${color}"></div></div>`;
         });
         ui.hostOverviewDisplay.innerHTML = html;
         ui.hostOverviewDisplay.classList.remove('hidden');
@@ -208,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('your_secret', (data) => {
-        ui.secretPieceDisplay.innerHTML = `<h4>Your Secret Piece:</h4><div style="display:flex;align-items:center;justify-content:center;gap:10px;"><span>Position ${data.pos}:</span><div style="width:30px;height:30px;border-radius:50%;background-color:${data.color};"></div></div>`;
+        ui.secretPieceDisplay.innerHTML = `<h4>Your Secret Piece:</h4><div style="display:flex;align-items:center;justify-content:center;gap:10px;"><span>Position ${data.pos}:</span><div class="guess-peg ${data.color}"></div></div>`;
     });
     
     socket.on('game_reset_full', (data) => { alert(data.message); window.location.reload(); });
