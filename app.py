@@ -116,6 +116,8 @@ def handle_start_game():
         secret = {"pos": positions.pop(0), "color": random.choice(SECRET_COLORS)}
         GAME.players[player_sid]["secret"] = secret
         emit('your_secret', secret, room=player_sid)
+        
+        ### CHANGE 2: Add this player's secret to the host's data ###
         host_overview_data[secret['pos']] = secret['color']
         print(f"Assigned secret to '{GAME.players[player_sid]['name']}'")
 
@@ -127,7 +129,9 @@ def handle_start_game():
     GAME.current_turn_sid = GAME.player_order[0]
     current_player_name = GAME.players[GAME.current_turn_sid]["name"]
     
+    ### CHANGE 2: Send the complete overview to the host only ###
     emit('host_overview', {'secrets': host_overview_data, 'unassigned_pos': unassigned_position}, room=GAME.host_sid)
+    
     emit('game_started', {'turn': current_player_name}, broadcast=True)
 
 @socketio.on('submit_guess')
@@ -172,3 +176,4 @@ def handle_guess(data):
 # This block is intentionally left out for Render deployment. 
 # if __name__ == '__main__':
 #     socketio.run(app, host='0.0.0.0', port=5000)
+
