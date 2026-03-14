@@ -53,16 +53,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
     const ui = {
-        loginArea: document.getElementById('login-area'),
-        gameControls: document.getElementById('game-controls'),
-        gameMain: document.getElementById('game-main'),
-        hostControls: document.getElementById('host-controls'),
-        playerList: document.getElementById('player-list'),
-        statusMessage: document.getElementById('status-message'),
-        myName: document.getElementById('my-name'),
-        secretPieceDisplay: document.getElementById('secret-piece-display'),
-        hostOverviewDisplay: document.getElementById('host-overview-display'),
-        startGameBtn: document.getElementById('start-game-btn'),
+        loginArea: document.getElementById('login-area'), gameControls: document.getElementById('game-controls'),
+        gameMain: document.getElementById('game-main'), hostControls: document.getElementById('host-controls'),
+        playerList: document.getElementById('player-list'), statusMessage: document.getElementById('status-message'),
+        myName: document.getElementById('my-name'), secretPieceDisplay: document.getElementById('secret-piece-display'),
+        hostOverviewDisplay: document.getElementById('host-overview-display'), startGameBtn: document.getElementById('start-game-btn'),
         resetGameBtn: document.getElementById('reset-game-btn'),
     };
     const state = { myName: '', isHost: false, GUESS_OPTIONS: [] };
@@ -166,23 +161,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const guessesTbody = document.getElementById('guesses-tbody');
         const row = guessesTbody.insertRow(0);
         const keyPegStyle = "width:20px;height:20px;border-radius:50%;display:inline-block;border:1px solid #5c3d2e;";
-
         let feedbackHTML = '';
         last_guess.feedback.forEach(pegColor => {
             feedbackHTML += `<div><div style="${keyPegStyle}background-color:${pegColor};"></div></div>`;
         });
-        // Add empty placeholders
         for (let i = 0; i < (4 - last_guess.feedback.length); i++) {
             feedbackHTML += `<div><div style="${keyPegStyle}background-color:transparent;"></div></div>`;
         }
-
         row.innerHTML = `
             <td style="border: 1px solid #795548; padding: 8px;">${last_guess.guesser}</td>
             ${last_guess.guess.map(c => `<td style="border: 1px solid #795548; padding: 8px;"><div class="guess-peg ${c}"></div></td>`).join('')}
             <td style="border: 1px solid #795548; padding: 8px; display:grid; grid-template-columns: repeat(4, auto); gap: 4px; justify-content: center;">
                 ${feedbackHTML}
             </td>`;
-        
         ui.statusMessage.textContent = `Turn: ${next_turn}`;
         resetGuessFields();
         const inputArea = document.getElementById('input-area');
@@ -216,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('your_secret', (data) => {
-        ui.secretPieceDisplay.innerHTML = `<h4>Your Secret Piece:</h4><div class="peg-container"><span>Position ${data.pos}:</span><div class="guess-peg ${data.color}"></div></div>`;
+        ui.secretPieceDisplay.innerHTML = `<h4>Your Secret Piece:</h4><div style="display:flex;align-items:center;justify-content:center;gap:10px;"><span>Position ${data.pos}:</span><div class="guess-peg ${data.color}"></div></div>`;
     });
     
     socket.on('game_reset_full', (data) => { alert(data.message); window.location.reload(); });
