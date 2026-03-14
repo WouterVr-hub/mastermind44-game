@@ -16,8 +16,9 @@
         .host-section, #secret-piece-display, #host-overview-display { margin-top: 15px; border-top: 2px solid #8c6d52; padding-top: 15px; }
         .peg-container { display: flex; align-items: center; justify-content: left; gap: 10px; margin-bottom: 5px; }
         .guess-peg { width: 30px; height: 30px; border-radius: 50%; display: inline-block; vertical-align: middle; box-shadow: inset 0 2px 4px rgba(0,0,0,0.4); }
+        .key-peg { width: 20px; height: 20px; border-radius: 50%; display: inline-block; border: 1px solid #5c3d2e; box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); }
         .red { background-color: #c62828; } .blue { background-color: #1565c0; } .green { background-color: #2e7d32; }
-        .yellow { background-color: #f9a825; } .black { background-color: #212121; } .white { background-color: #e0e0e0; border: 1px solid #999; }
+        .yellow { background-color: #f9a825; } .black { background-color: #212121; } .white { background-color: #e0e0e0; }
         .empty { background: repeating-linear-gradient(45deg, #a1887f, #a1887f 5px, #8d7468 5px, #8d7468 10px); }
     </style>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -160,20 +161,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const { last_guess, next_turn } = data;
         const guessesTbody = document.getElementById('guesses-tbody');
         const row = guessesTbody.insertRow(0);
-        const keyPegStyle = "width:20px;height:20px;border-radius:50%;display:inline-block;border:1px solid #5c3d2e;";
+
         let feedbackHTML = '';
         last_guess.feedback.forEach(pegColor => {
-            feedbackHTML += `<div><div style="${keyPegStyle}background-color:${pegColor};"></div></div>`;
+            feedbackHTML += `<div><div class="key-peg ${pegColor}"></div></div>`;
         });
+        // Add empty placeholders for the remaining feedback slots
         for (let i = 0; i < (4 - last_guess.feedback.length); i++) {
-            feedbackHTML += `<div><div style="${keyPegStyle}background-color:transparent;"></div></div>`;
+            feedbackHTML += `<div><div class="key-peg empty"></div></div>`;
         }
+
         row.innerHTML = `
             <td style="border: 1px solid #795548; padding: 8px;">${last_guess.guesser}</td>
-            ${last_guess.guess.map(c => `<td style="border: 1px solid #795548; padding: 8px;"><div class="guess-peg ${c}"></div></td>`).join('')}
+            ${last_guess.guess.map(c => `<td style="border: 1px solid #795548; padding: 8px; text-align: center;"><div class="guess-peg ${c}"></div></td>`).join('')}
             <td style="border: 1px solid #795548; padding: 8px; display:grid; grid-template-columns: repeat(4, auto); gap: 4px; justify-content: center;">
                 ${feedbackHTML}
             </td>`;
+        
         ui.statusMessage.textContent = `Turn: ${next_turn}`;
         resetGuessFields();
         const inputArea = document.getElementById('input-area');
@@ -207,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('your_secret', (data) => {
-        ui.secretPieceDisplay.innerHTML = `<h4>Your Secret Piece:</h4><div style="display:flex;align-items:center;justify-content:center;gap:10px;"><span>Position ${data.pos}:</span><div class="guess-peg ${data.color}"></div></div>`;
+        ui.secretPieceDisplay.innerHTML = `<h4>Your Secret Piece:</h4><div class="peg-container"><span>Position ${data.pos}:</span><div class="guess-peg ${data.color}"></div></div>`;
     });
     
     socket.on('game_reset_full', (data) => { alert(data.message); window.location.reload(); });
