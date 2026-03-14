@@ -28,7 +28,8 @@ class GameState:
         print("--- New, Clean GameState created. Server is ready. ---")
 
     def get_player_list_data(self):
-        return [data["name"] for data in self.players.values()]
+        # FIX for 'undefined' names: Send a list of objects with a name property.
+        return [{"name": data["name"]} for data in self.players.values()]
 
     def reset_board(self):
         for player_data in self.players.values():
@@ -60,7 +61,6 @@ def handle_disconnect():
     if request.sid in GAME.players:
         player_name = GAME.players.pop(request.sid).get("name", "A player")
         print(f"Player '{player_name}' disconnected.")
-        
         if request.sid == GAME.host_sid:
             print("Host disconnected. Full server reset.")
             GAME = GameState()
@@ -134,27 +134,26 @@ def handle_guess(data):
     if not isinstance(guess, list) or len(guess) != CODE_LENGTH: return
 
     guesser_name = GAME.players[sid]["name"]
+    feedback = []
     
-    # This logic now matches classic Mastermind: black and white pegs for the whole code.
     temp_secret = list(GAME.secret_code)
     temp_guess = list(guess)
-    feedback = []
-
-    # First pass for black pegs (correct color in correct position)
+    
+    # First pass for black pegs
     for i in range(CODE_LENGTH):
         if temp_secret[i] != 'empty' and temp_secret[i] == temp_guess[i]:
             feedback.append('black')
-            temp_secret[i] = None # Mark as checked in secret
-            temp_guess[i] = None  # Mark as checked in guess
+            temp_secret[i] = None
+            temp_guess[i] = None
 
-    # Second pass for white pegs (correct color in wrong position)
+    # Second pass for white pegs
     for i in range(CODE_LENGTH):
         if temp_guess[i] is not None and temp_guess[i] != 'empty':
             if temp_guess[i] in temp_secret:
                 feedback.append('white')
-                temp_secret.remove(temp_guess[i]) # Remove from secret to prevent double counting
+                temp_secret.remove(temp_guess[i])
     
-    random.shuffle(feedback) # Shuffle feedback to hide position info
+    random.shuffle(feedback)
     GAME.guesses.append({"guesser": guesser_name, "guess": guess, "feedback": feedback})
     
     if data.get('is_final'):
