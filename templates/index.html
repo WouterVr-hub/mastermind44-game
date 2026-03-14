@@ -369,12 +369,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('update_player_list', (data) => {
+        // THE FIX: data.players is now an array of objects like [{name: "Wouter"}, {name: "laptop"}]
+        players = data.players; 
         ui.playerList.innerHTML = '';
-        data.players.forEach(p => ui.playerList.innerHTML += `<li>${p.name}</li>`);
-        if (state.isHost) {
-            const playerCount = data.players.filter(p => !p.is_host).length;
-            ui.startGameBtn.disabled = playerCount < 2;
-            ui.startGameBtn.textContent = playerCount >= 2 ? "Start Game" : "Need 2+ Players";
+        // We now correctly iterate over the array and access the .name property of each object.
+        players.forEach(p => {
+            const li = document.createElement('li');
+            li.textContent = p.name;
+            ui.playerList.appendChild(li);
+        });
+        
+        if (isHost) {
+            renderHostSetupUI();
         }
     });
     
