@@ -52,12 +52,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
-    setInterval(() => {
-        if (socket.connected) {
-            socket.emit('client_ping');
-            console.log("Ping sent to server to keep connection alive.");
-        }
-    }, 240000);
     const ui = {
         loginArea: document.getElementById('login-area'),
         gameControls: document.getElementById('game-controls'),
@@ -137,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('update_player_list', (data) => {
         ui.playerList.innerHTML = '';
-        // FIX 2a: Iterate through player *objects* and access the .name property.
+        // FIX 1: Iterate through player *objects* and access the .name property.
         data.players.forEach(player => {
             const li = document.createElement('li');
             li.textContent = player.name; // Access the name property
@@ -145,13 +139,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (state.isHost) {
-            // FIX 2b: When filtering, access the .name property of the player object.
+            // FIX 2: When filtering, access the .name property of the player object.
             const playerCount = data.players.filter(player => !player.name.includes('(Host)')).length;
             ui.startGameBtn.disabled = playerCount < 2;
             ui.startGameBtn.textContent = playerCount >= 2 ? "Start Game" : "Need 2+ Players";
         }
     });
     
+    // ... (rest of the client-side code is correct) ...
     socket.on('is_host', (data) => {
         state.isHost = data.is_host;
         if (state.isHost) ui.hostControls.classList.remove('hidden');
@@ -169,11 +164,10 @@ document.addEventListener('DOMContentLoaded', () => {
             inputArea.classList.remove('hidden');
         }
     });
-    
+
     socket.on('new_turn', (data) => {
         const { last_guess, next_turn } = data;
         const guessesTbody = document.getElementById('guesses-tbody');
-        if (!guessesTbody) return; // Guard against errors if board isn't rendered
         const row = guessesTbody.insertRow(0);
         const keyPegStyle = "width:20px;height:20px;border-radius:50%;display:inline-block;border:1px solid #5c3d2e;";
         let feedbackHTML = '';
@@ -198,17 +192,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    socket.on('eliminated', (data) => {
-        const li_elements = Array.from(ui.playerList.getElementsByTagName('li'));
-        const player_li = li_elements.find(li => li.textContent.startsWith(data.name));
-        if (player_li) {
-            player_li.innerHTML = `<s>${player_li.textContent}</s> (Eliminated)`;
-        }
-        if (data.name === state.myName) {
-            alert("Your final guess was incorrect. You have been eliminated.");
-        }
-    });
-
     socket.on('host_overview', (data) => {
         if (!state.isHost) return;
         let html = '<h4>Secret Code Overview:</h4>';
@@ -231,21 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         ui.statusMessage.textContent = 'Waiting for Host to start a new game...';
     });
-    
-    socket.on('game_over', (data) => {
-        let msg = '';
-        if (data.winner) {
-            msg = `Game Over! ${data.winner} has won the game!`;
-        } else {
-             msg = data.message || 'Game Over! All players were eliminated!';
-        }
-        if (data.secret_code) {
-             msg += `\nThe secret code was: ${data.secret_code.join(', ')}`;
-        }
-        alert(msg);
-        // A reset event will typically follow from the server logic
-    });
-    
+
     socket.on('your_secret', (data) => {
         ui.secretPieceDisplay.innerHTML = `<h4>Your Secret Piece:</h4><div style="display:flex;align-items:center;justify-content:center;gap:10px;"><span>Position ${data.pos}:</span><div class="guess-peg ${data.color}"></div></div>`;
     });
