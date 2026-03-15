@@ -52,6 +52,12 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
+    setInterval(() => {
+        if (socket.connected) {
+            socket.emit('client_ping');
+            console.log("Ping sent to server to keep connection alive.");
+        }
+    }, 240000);
     const ui = {
         loginArea: document.getElementById('login-area'),
         gameControls: document.getElementById('game-controls'),
