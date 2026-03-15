@@ -49,6 +49,13 @@ GAME = GameState()
 def index():
     return render_template('index.html')
 
+# FIX: Add a handler for the client's keep-alive ping.
+@socketio.on('client_ping')
+def handle_client_ping():
+    # This function intentionally does nothing. Its sole purpose is to receive
+    # an event from the client to keep the Render service from going idle.
+    pass
+
 @socketio.on('connect')
 def handle_connect():
     print(f"Client connected: {request.sid}")
