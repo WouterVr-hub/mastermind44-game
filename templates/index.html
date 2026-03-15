@@ -131,13 +131,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('update_player_list', (data) => {
         ui.playerList.innerHTML = '';
-        data.players.forEach(name => {
+        // FIX 1: Iterate through the list of player *objects* and access the .name property.
+        data.players.forEach(player => {
             const li = document.createElement('li');
-            li.textContent = name;
+            li.textContent = player.name; // Access the name property
             ui.playerList.appendChild(li);
         });
+
         if (state.isHost) {
-            const playerCount = data.players.filter(name => !name.includes('(Host)')).length;
+            // FIX 2: When filtering, access the .name property of the player object.
+            const playerCount = data.players.filter(player => !player.name.includes('(Host)')).length;
             ui.startGameBtn.disabled = playerCount < 2;
             ui.startGameBtn.textContent = playerCount >= 2 ? "Start Game" : "Need 2+ Players";
         }
@@ -164,12 +167,14 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('new_turn', (data) => {
         const { last_guess, next_turn } = data;
         const guessesTbody = document.getElementById('guesses-tbody');
+        if (!guessesTbody) return; // Guard against errors if board isn't rendered
         const row = guessesTbody.insertRow(0);
         const keyPegStyle = "width:20px;height:20px;border-radius:50%;display:inline-block;border:1px solid #5c3d2e;";
         let feedbackHTML = '';
         last_guess.feedback.forEach(pegColor => {
             feedbackHTML += `<div><div style="${keyPegStyle}background-color:${pegColor};"></div></div>`;
         });
+        // This loop seems to have a bug, it should be NUM_COLOR_PEGS (4)
         for (let i = 0; i < (4 - last_guess.feedback.length); i++) {
             feedbackHTML += `<div><div style="${keyPegStyle}" class="empty"></div></div>`;
         }
